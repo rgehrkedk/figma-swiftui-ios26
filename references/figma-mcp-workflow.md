@@ -89,7 +89,48 @@ Compare your SwiftUI output to the screenshot from Step 3. Common discrepancies:
 
 ## SwiftUI → Figma Workflow
 
-### Step 1: Search for Matching Components
+### Step 0: Screenshot the Running App (MANDATORY)
+
+Before reading any code, capture a screenshot of the actual rendered UI from the simulator. This is the visual ground truth — code alone cannot convey exact colors (which interact with opacity and backgrounds), spacing feel, or visual weight.
+
+Use XcodeBuildMCP tools if available:
+1. `session_show_defaults` — verify simulator is configured
+2. `build_run_sim` — build and launch the app
+3. `tap` (label: "...") — navigate to the target screen using accessibility labels
+4. `screenshot` (returnFormat: "base64") — capture the screen
+
+If the target screen requires navigation (login, tab switches), use the `tap` tool with the element's accessibility label. Use `snapshot_ui` to discover available labels and coordinates if a label-based tap fails.
+
+### Step 1: Read the Code Carefully
+
+Read the SwiftUI view file AND its associated styles/constants file. Pay attention to:
+- **Layout constants** — exact padding, corner radius, spacing, height values
+- **Opacity values** — these dramatically affect visual appearance (0.25 vs 0.85 look completely different)
+- **Font specs** — `.callout.weight(.semibold)` = 16pt semibold, `.caption2.weight(.bold)` = 11pt bold, etc.
+
+### Step 2: Trace Colors and Icons to Source
+
+Never guess colors from variable names. Follow the full resolution chain:
+
+```
+View: .foregroundStyle(trend.direction.trendColor)
+  → TrendDirection enum: case .strongUp → AppTheme.success
+    → Theme.swift: static let success = GeneratedColors.success
+      → SemanticColors.swift: Color("Success")
+        → theme.dark.json: "success": { "$value": "{green.400}" }
+          → base.json: "green.400": "hsl(113 84% 60%)"
+            → RGB: (0.22, 0.93, 0.17)
+```
+
+Do the same for SF Symbol icon names — trace through computed properties and enums:
+
+```
+View: Image(systemName: trend.iconName)
+  → CardTrendResult.iconName → direction.iconName
+    → TrendDirection.iconName: case .strongUp → "chevron.up.2"
+```
+
+### Step 3: Search for Matching Figma Components
 
 Use `search_design_system` to find the Figma component that matches your SwiftUI view.
 
@@ -117,20 +158,97 @@ Parameters:
 
 See component-mapping.md "Reverse Lookup" section for the complete mapping.
 
-### Step 2: Get Component Details
+### Step 4: Handle SF Symbols
 
-Once you find the component, use `get_design_context` with its nodeId to get the full structure.
+The Apple iOS 26 Figma kit does NOT include standalone SF Symbol glyphs. The "Icons - Symbols" component set contains only size placeholders. **Use the SF Symbol CLI to export pixel-perfect vector SVGs, then inject via `figma.createNodeFromSvg()`.**
 
-### Step 3: Create or Update in Figma
+#### SF Symbol CLI Tool
 
-Use `use_figma` to create new designs or modify existing ones:
+A self-contained tool at `tools/sf-symbol-svg.sh` (in this skill directory) extracts exact Apple vector outlines from the system asset catalog. It auto-compiles on first use — no setup needed. Requires macOS 14+ and Xcode Command Line Tools.
 
+**Export SVG:**
+```bash
+.claude/skills/figma-swiftui-ios26/tools/sf-symbol-svg.sh export chevron.right --weight bold --size 24
+.claude/skills/figma-swiftui-ios26/tools/sf-symbol-svg.sh export chevron.up.2 --weight bold --size 24
 ```
-Tool: use_figma
-Parameters:
-  fileKey: "<target file>"
-  updates: "<description of what to create/modify>"
+
+**Search symbols:**
+```bash
+.claude/skills/figma-swiftui-ios26/tools/sf-symbol-svg.sh search chevron
+.claude/skills/figma-swiftui-ios26/tools/sf-symbol-svg.sh info star.fill
 ```
+
+**Weight options:** `ultralight`, `thin`, `light`, `regular`, `medium`, `semibold`, `bold`, `heavy`, `black` — match to the SwiftUI font weight context.
+
+#### Cross-Platform Python Wrapper
+
+`tools/sf_symbol_svg.py` wraps the CLI with fallback to pre-cached SVGs. Works on any OS with Python 3 — on macOS it auto-compiles and uses the Swift CLI for pixel-perfect results; elsewhere it uses `tools/symbol-cache/` (common symbols pre-exported at regular weight).
+
+**Quick export for Figma (generates ready-to-paste JS):**
+```bash
+python3 .claude/skills/figma-swiftui-ios26/tools/sf_symbol_svg.py \
+  export-for-figma chevron.up.2 --weight bold \
+  --display-width 11 --display-height 12 --color "#38ED2B"
+```
+
+This outputs a JSON with a `js` field containing a complete `figma.createNodeFromSvg()` snippet — just paste it into `use_figma` code.
+
+#### Inject into Figma
+
+Use `figma.createNodeFromSvg()` in `use_figma` with the CLI output:
+
+```javascript
+// 1. Get SVG string from CLI output (or embed directly)
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="7" height="11" 
+  viewBox="-0.00 0.00 20.32 34.14">
+  <path d="M20.32 17.07C20.31 18.06..." fill="currentColor"/>
+</svg>`;
+
+// 2. Create node from SVG
+const node = figma.createNodeFromSvg(svg);
+node.name = "chevron.right";
+
+// 3. Resize to match the SwiftUI font size context
+// .caption2.bold() ≈ 11pt → roughly 7x11px for chevron.right
+node.resize(7, 11);
+
+// 4. Recolor — SVG imports as black, change fills on the vector child
+const vectors = node.findAll(n => n.type === "VECTOR");
+for (const v of vectors) {
+  v.fills = [{ type: "SOLID", color: { r: 1, g: 1, b: 1 }, opacity: 0.18 }];
+}
+
+// 5. Append to parent auto-layout frame
+parentFrame.appendChild(node);
+```
+
+**Important notes:**
+- Set `width` and `height` in the SVG tag to the desired display size (not the original export size) — the `viewBox` preserves the path proportions
+- The CLI `--weight` flag maps to SwiftUI font weights: `regular`, `medium`, `semibold`, `bold`, `heavy`, `black`
+- Match the weight to the SwiftUI icon context (e.g., `.caption2.bold()` → `--weight bold`)
+- The CLI requires macOS 14+ with SF Symbols installed
+- Caveats: uses CoreUI private API — works on macOS 14/15/26 but could change in future OS versions
+
+#### What does NOT work
+
+| Approach | Problem |
+|---|---|
+| Unicode codepoints as text (`String.fromCodePoint()`) | Figma's text renderer doesn't display SF Pro PUA characters (U+100000+) when inserted via Plugin API |
+| Apple iOS 26 Figma kit "Icons - Symbols" | Only contains size placeholders, not actual glyphs |
+| Copy-paste from SF Symbols Mac app | Works visually but is manual, not automatable from `use_figma` |
+| npm packages with SF Symbol SVGs | Apple copyright violation risk |
+
+### Step 5: Create or Update in Figma
+
+Use `use_figma` to create new designs or modify existing ones. Build the Figma frame hierarchy to mirror the SwiftUI view hierarchy — each `VStack`/`HStack` becomes a Figma auto-layout frame.
+
+### Step 6: Validate Against Screenshot
+
+Compare the Figma output to the simulator screenshot from Step 0. Common discrepancies:
+- Card opacity too high/low (check the styles file for exact values)
+- Wrong accent color (trace through theme tokens)
+- Wrong icon (trace through enum computed properties)
+- Spacing doesn't match (check layout constants file)
 
 ## Design Token Workflow
 
@@ -175,6 +293,78 @@ When `get_design_context` returns a component instance:
 - The response includes the main component's properties and variants
 - Check if a Code Connect mapping exists for the main component
 - Variant properties (e.g., `State=Pressed`, `Size=Large`) map to SwiftUI modifiers
+
+## Figma Plugin API Gotchas (`use_figma`)
+
+When writing JavaScript for `use_figma`, these are common errors and how to avoid them:
+
+### Font Loading
+
+Figma requires exact `{ family, style }` pairs. Names vary per font installation — never guess.
+
+```javascript
+// BAD — "SF Pro Text" and "SemiBold" are wrong on most systems
+await figma.loadFontAsync({ family: "SF Pro Text", style: "SemiBold" });
+
+// GOOD — discover first, then use exact names
+const fonts = await figma.listAvailableFontsAsync();
+const sfFonts = fonts.filter(f => f.fontName.family.startsWith("SF Pro"));
+// Common correct names: "SF Pro" (not "SF Pro Text"), "Semi Bold" (with space for Inter)
+await figma.loadFontAsync({ family: "SF Pro", style: "Semibold" });
+await figma.loadFontAsync({ family: "SF Pro Rounded", style: "Bold" });
+```
+
+**Rule:** Always call `figma.listAvailableFontsAsync()` and check exact family/style strings before loading fonts. Font names differ between macOS, Windows, and Figma's cloud rendering.
+
+### Auto-Layout Sizing
+
+`layoutSizingHorizontal = "FILL"` and `layoutSizingVertical = "FILL"` can only be set on nodes that are **already children** of an auto-layout frame. Setting them before `appendChild` throws.
+
+```javascript
+// BAD — setting FILL before the node is a child of an auto-layout parent
+const child = figma.createFrame();
+child.layoutSizingHorizontal = "FILL"; // ERROR: not a child of auto-layout frame
+parent.appendChild(child);
+
+// GOOD — add to parent first, then set sizing
+const child = figma.createFrame();
+parent.appendChild(child);
+child.layoutSizingHorizontal = "FILL"; // Works — now it's a child of auto-layout parent
+```
+
+### counterAxisSizingMode vs layoutSizing
+
+`counterAxisSizingMode` only accepts `"FIXED"` or `"AUTO"`. To make a child fill its parent's cross-axis, use `layoutSizingHorizontal`/`layoutSizingVertical` on the **child** after appending it.
+
+```javascript
+// BAD — "FILL_CONTAINER" is not a valid enum value for counterAxisSizingMode
+frame.counterAxisSizingMode = "FILL_CONTAINER"; // ERROR
+
+// GOOD — set on the child after appending
+parent.appendChild(frame);
+frame.layoutSizingHorizontal = "FILL";
+```
+
+### Frame Properties Are Not Extensible
+
+Figma nodes are sealed objects. You cannot assign arbitrary properties (like `.fontSize` on a Frame). Only set properties that exist on the node type.
+
+```javascript
+// BAD — frames don't have fontSize
+const header = figma.createFrame();
+header.fontSize = 13; // TypeError: object is not extensible
+
+// GOOD — fontSize goes on Text nodes only
+const text = figma.createText();
+text.fontSize = 13;
+```
+
+### Operation Order Summary
+
+1. Create the frame/node
+2. Set intrinsic properties (`resize`, `fills`, `cornerRadius`, `layoutMode`, `paddingTop`, etc.)
+3. `appendChild` to parent
+4. Set parent-dependent properties (`layoutSizingHorizontal = "FILL"`, `layoutSizingVertical = "FILL"`)
 
 ## Rate Limits and Efficiency
 

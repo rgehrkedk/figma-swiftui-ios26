@@ -37,11 +37,13 @@ The Figma MCP server handles discovery and fetching but outputs **React + Tailwi
 
 ### SwiftUI → Figma
 
-1. **Read the SwiftUI code** — Understand the view hierarchy, modifiers, and layout intent
-2. **Map to Figma components** — Use the [Component Mapping](references/component-mapping.md) reference to find the corresponding Figma component names
-3. **Search the design system** — Call `search_design_system` with the Figma component name to get the component key
-4. **Get reference screenshots** — Call `get_screenshot` with the component key to see the Figma component's appearance
-5. **Create or update the design** — Use `use_figma` to build or modify frames in Figma, using library components where available
+1. **Screenshot the running app first** — Before reading any code, capture a screenshot of the actual rendered UI from the simulator. Code alone cannot convey exact colors, opacity interactions, spacing feel, or visual weight. Use XcodeBuildMCP's `screenshot` tool (requires the app running in the simulator). This is the visual ground truth — everything else is verified against it.
+2. **Read the SwiftUI code** — Understand the view hierarchy, modifiers, and layout intent. Read the styles/constants file too (e.g. `*Styles.swift`) for exact padding, corner radius, font sizes, and opacity values.
+3. **Trace colors and icons to their source** — Never guess colors from variable names. Follow the full chain: view → data model/enum → theme token → design token → base palette value. A property named `trendColor` might resolve to `AppTheme.success.opacity(0.5)` → `green.400` → `hsl(113, 84%, 60%)`. Get the actual RGB values. Same for SF Symbol icon names — trace through enums and computed properties to find the exact `systemName` string.
+4. **Map to Figma components** — Use the [Component Mapping](references/component-mapping.md) reference to find the corresponding Figma component names
+5. **Search the design system** — Call `search_design_system` with the Figma component name to get the component key
+6. **Create or update the design** — Use `use_figma` to build or modify frames in Figma, using library components where available
+7. **Validate against the screenshot** — Compare the Figma output to the simulator screenshot captured in step 1. Iterate until they match.
 
 ## Quick Reference: Critical iOS 26 SwiftUI APIs
 
@@ -82,6 +84,12 @@ These APIs have **no equivalent in React/Tailwind** and require explicit knowled
 7. **Searching Figma with SwiftUI names** — `search_design_system` uses Figma component names, not SwiftUI names. Search "Liquid Glass" not "glassEffect", "Row" not "List", "Segmented control" not "Picker(.segmented)".
 
 8. **Forgetting backward compatibility** — If the project supports iOS 17/18 alongside iOS 26, wrap new APIs in `if #available(iOS 26, *)` guards. Figma shows the iOS 26 appearance; the code may need fallbacks.
+
+9. **Skipping the simulator screenshot** — Translating SwiftUI → Figma from code alone consistently produces wrong results. Colors interact with opacity and backgrounds in ways that aren't obvious from reading code. A `cardOpacity: 0.25` looks completely different from `0.85`. Always screenshot the running app first.
+
+10. **Guessing SF Symbol icons from context** — SF Symbols must be traced through the code. An icon labeled "trend" might use `chevron.up.2`, `arrow.up`, `chevron.up`, or `minus` depending on a computed property chain. Read the enum/model that produces the icon name, don't infer from the visual role.
+
+11. **Using wrong SF Symbol approach in Figma** — The Apple iOS 26 Figma kit does NOT include usable SF Symbol glyphs (only size placeholders). Unicode codepoints via `String.fromCodePoint()` don't render in Figma's text engine. Hand-drawn vector paths are approximate. **The correct approach:** use the SF Symbol CLI (`tools/sf_symbol_cli.swift`) to export pixel-perfect SVGs from Apple's system asset catalog, then inject via `figma.createNodeFromSvg()`. See the [Figma MCP Workflow](references/figma-mcp-workflow.md) Step 4 for details.
 
 ## Prerequisites
 
