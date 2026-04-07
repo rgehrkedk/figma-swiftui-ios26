@@ -4,24 +4,38 @@ Optimal tool call sequences for translating between Figma designs and SwiftUI co
 
 ## Available MCP Tools
 
+### Read Tools
+
 | Tool | Purpose | When to Use |
 |---|---|---|
 | `get_design_context` | Fetch design code + screenshot + hints for a node | **Primary tool** — always start here for Figma→Code |
 | `get_screenshot` | Get a PNG screenshot of a node | Visual reference, validation, comparing output to design |
-| `search_design_system` | Find components in connected Figma libraries | Code→Figma direction, finding the right component name |
+| `get_metadata` | Get sparse XML of selection (IDs, names, types, positions, sizes) | Large files — find the right page/node before `get_design_context` |
 | `get_variable_defs` | Fetch design token variables from a file | Mapping Figma tokens to project color/spacing/typography system |
-| `get_metadata` | Get file structure and page list | Large files — find the right page/node before `get_design_context` |
+| `search_design_system` | Find components in connected Figma libraries | Code→Figma direction, finding the right component name |
 | `get_code_connect_map` | Check existing Code Connect mappings | Skip translation if a mapping already exists |
 | `get_code_connect_suggestions` | AI-suggested component mappings | Bootstrapping Code Connect for a project |
-| `use_figma` | Create/modify Figma designs | Code→Figma: push designs back into Figma |
-| `whoami` | Check authentication and quota | Verify access before starting work |
+| `get_figjam` | Convert FigJam diagrams to XML with screenshots | Extracting diagrams, flowcharts, or planning boards |
+| `whoami` | Check identity, plan, seat type, and quota (remote only) | Verify access before starting work |
+
+### Write Tools
+
+| Tool | Purpose | When to Use |
+|---|---|---|
+| `use_figma` | General-purpose: create/edit/delete any Figma object | Code→Figma: push designs back into Figma. Currently **free during beta** |
+| `add_code_connect_map` | Create mappings between Figma nodes and code components | After translating a component — codify the mapping for future reuse |
+| `send_code_connect_mappings` | Confirm mappings after `get_code_connect_suggestions` | Accepting AI-suggested Code Connect mappings |
+| `create_design_system_rules` | Generate rules files for AI agent context | Encoding iOS 26 SwiftUI conventions so agents follow project patterns |
+| `generate_figma_design` | Capture web pages/live UIs into Figma designs (remote only) | Validate simulator output by generating a Figma design from a live UI |
+| `generate_diagram` | Create FigJam diagrams from Mermaid syntax | Architecture docs, flowcharts, state diagrams, sequence diagrams |
+| `create_new_file` | Create blank Figma Design or FigJam file in drafts | Starting fresh SwiftUI→Figma workflows without an existing file |
 
 ## Figma → SwiftUI Workflow
 
 ### Step 1: Get Design Context
 
 Always start with `get_design_context`. This returns:
-- **Code** (React + Tailwind by default)
+- **Code** (React + Tailwind by default, or SwiftUI if Code Connect is configured)
 - **Screenshot** (visual preview)
 - **Hints** (Code Connect snippets, component docs, annotations, tokens)
 
@@ -30,6 +44,7 @@ Tool: get_design_context
 Parameters:
   fileKey: "<from URL>"
   nodeId: "<from URL, convert '-' to ':'>"
+  clientFrameworks: "SwiftUI"  // Optional (remote only) — filters Code Connect to SwiftUI mappings
 ```
 
 **URL parsing rules:**
@@ -370,8 +385,10 @@ text.fontSize = 13;
 
 ### Quota
 
-- **Organization Full seat**: 200 tool calls/day
-- **Free/Viewer seat**: Lower limits
+- **Dev/Full seats** (Professional/Organization/Enterprise): Per-minute limits matching Figma REST API Tier 1
+- **Starter/View/Collab seats**: Maximum **6 tool calls per month**
+- **Write operations** (`use_figma`, `add_code_connect_map`, etc.): Currently **exempt from rate limits** during beta — will become usage-based paid
+- Use `whoami` (remote only) to check your current plan, seat type, and remaining quota
 
 ### Optimization Tips
 
@@ -418,3 +435,171 @@ Designer annotations appear as notes attached to nodes:
 - Temporary URLs valid during the MCP session
 - Suitable for preview but not production
 - Extract and add assets to the project's asset catalog for production use
+
+## Code Connect Workflow
+
+Code Connect maps Figma components directly to your SwiftUI code. Once set up, `get_design_context` returns your actual SwiftUI snippets instead of React+Tailwind — eliminating the translation step for mapped components.
+
+### Setting Up Code Connect for SwiftUI
+
+See [Code Connect SwiftUI Reference](code-connect-swiftui.md) for full setup details. Summary:
+
+1. Add `@figma/code-connect` as a Swift Package dependency
+2. Create `FigmaConnect` structs that map Figma component properties to SwiftUI views
+3. Use `add_code_connect_map` to register mappings via MCP
+4. On the remote server, set `clientFrameworks: "SwiftUI"` to filter mappings
+
+### Acceleration Loop
+
+Code Connect works best as an optimization layer after initial translations:
+
+1. **Translate** a Figma component to SwiftUI using this skill's reference tables
+2. **Verify** the translation is correct (visual parity with screenshot)
+3. **Codify** the mapping as a `FigmaConnect` struct in your Xcode project
+4. **Register** via `add_code_connect_map` so future translations of the same component are automatic
+
+```
+Tool: add_code_connect_map
+Parameters:
+  fileKey: "<fileKey>"
+  nodeId: "<component nodeId>"
+  // Maps the component to your SwiftUI implementation
+```
+
+### Checking Existing Mappings
+
+Always check for Code Connect mappings before translating:
+
+```
+Tool: get_code_connect_map
+Parameters:
+  fileKey: "<fileKey>"
+  nodeId: "<nodeId>"
+  clientFrameworks: "SwiftUI"  // Filter to SwiftUI mappings (remote only)
+```
+
+If mappings exist, use them directly — they reflect the project's actual API and are more accurate than a fresh translation.
+
+## Design System Rules
+
+Use `create_design_system_rules` to generate a rules file that teaches AI agents your project's iOS 26 SwiftUI conventions. This reduces repetitive prompting and ensures consistent output.
+
+### Creating Rules for iOS 26 SwiftUI Projects
+
+```
+Tool: create_design_system_rules
+```
+
+When prompted, specify conventions like:
+- Use `.glassEffect()` for navigation chrome, never for content areas
+- Prefer `.buttonStyle(.glass)` over manual glass modifiers on buttons
+- Use `GlassEffectContainer(spacing:)` when multiple glass elements are adjacent
+- Prefer Dynamic Type (`.font(.headline)`) over fixed font sizes
+- Map Figma design tokens to project's `AppTheme` constants
+- Standard controls (Toggle, Slider, Stepper) get glass automatically on iOS 26 — don't add `.glassEffect()`
+
+The generated rules file should be saved to your project's `rules/` or `.cursor/rules/` directory.
+
+## FigJam Workflows
+
+### Reading FigJam Boards
+
+```
+Tool: get_figjam
+Parameters:
+  fileKey: "<fileKey>"
+  nodeId: "<nodeId>"
+```
+
+Returns XML metadata with screenshots of FigJam elements. Useful for extracting flowcharts, user journeys, or architectural diagrams that inform SwiftUI implementation.
+
+### Generating Diagrams
+
+```
+Tool: generate_diagram
+Parameters:
+  // Describe the diagram in natural language — the agent generates Mermaid syntax
+```
+
+Supported diagram types: flowchart, Gantt chart, state diagram, sequence diagram. Useful for documenting SwiftUI view hierarchies or navigation flows as FigJam diagrams.
+
+## New File Creation
+
+```
+Tool: create_new_file
+```
+
+Creates a blank Figma Design or FigJam file in the authenticated user's drafts. Use this when starting a SwiftUI→Figma workflow without an existing target file. If the user belongs to multiple plans, it will prompt for team/organization selection.
+
+## Capturing Live UIs into Figma
+
+```
+Tool: generate_figma_design
+// Remote MCP server only
+```
+
+Captures web pages or live UIs into native Figma designs. For SwiftUI workflows, this can be used to:
+- Generate a Figma representation from a running web preview of your app
+- Compare captured output against existing Figma designs
+- Bootstrap a Figma file from an existing implementation
+
+**Limitations:** Remote server only, select MCP clients, exempt from standard rate limits.
+
+## Figma Make Integration
+
+Figma Make is an AI app builder that creates working prototypes from natural language prompts. These prototypes can be used as input for SwiftUI translation.
+
+### Figma Make → SwiftUI Workflow
+
+```
+1. Create prototype in Figma Make (prompt → working UI)
+   ↓
+2. Get the Make file URL: figma.com/make/:makeFileKey/:name
+   ↓
+3. Call get_design_context with makeFileKey as fileKey
+   ↓
+4. Translate the React+Tailwind output to SwiftUI using this skill
+   ↓
+5. Apply iOS 26 patterns (glass effects, controls, navigation)
+```
+
+Make files use the same `get_design_context` tool — use the `makeFileKey` from the URL as the `fileKey` parameter.
+
+### When to Use Figma Make as Input
+
+- **Rapid prototyping**: Describe a screen in natural language → get a prototype → translate to native SwiftUI
+- **Exploring layouts**: Generate multiple layout variations quickly → pick the best → translate
+- **Stakeholder mockups**: Build a quick interactive demo → then implement in SwiftUI with proper APIs
+
+## Code-to-Canvas (SwiftUI → Figma)
+
+Figma's Code-to-Canvas feature accepts code (React, HTML, or SwiftUI) and generates an editable Figma component. This is a faster alternative to manually building Figma frames via `use_figma`.
+
+### Code-to-Canvas Workflow
+
+```
+1. Write or refine SwiftUI code
+   ↓
+2. Paste into Figma's Code-to-Canvas feature
+   ↓
+3. Figma generates an editable component on the canvas
+   ↓
+4. Refine in Figma (adjust spacing, colors, add design tokens)
+   ↓
+5. Optionally re-export via get_design_context to verify round-trip
+```
+
+### When Code-to-Canvas Is Better Than `use_figma`
+
+| Approach | Best For |
+|----------|---------|
+| **Code-to-Canvas** | Quick one-shot conversion, visual refinement in Figma, design handoff |
+| **`use_figma`** | Programmatic creation, batch operations, precise control, automation |
+| **Combined** | Code-to-Canvas for initial structure → `use_figma` for refinements and SF Symbol injection |
+
+### Limitations
+
+- Code-to-Canvas works best with simple, self-contained components
+- Complex SwiftUI (navigation stacks, sheets, state management) may not translate fully
+- Design tokens and variables need manual connection after generation
+- SF Symbols still require the CLI tool for pixel-perfect injection
