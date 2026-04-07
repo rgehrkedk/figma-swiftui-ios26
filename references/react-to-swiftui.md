@@ -156,6 +156,59 @@ When the React output contains these patterns, they likely represent iOS 26 Liqu
 | `useEffect` | `.task { }` or `.onAppear { }` |
 | `onClick` | `Button` or `.onTapGesture { }` |
 
+## Animation & Transitions
+
+| React/Tailwind/CSS | SwiftUI | Notes |
+|---|---|---|
+| `transition-all duration-300` | `.animation(.easeInOut(duration: 0.3), value: trigger)` | Implicit animation |
+| `transition-opacity` | `withAnimation { opacity = newValue }` | Explicit animation on state change |
+| `transform scale-110` | `.scaleEffect(1.1)` | Scale transform |
+| `transform rotate-45` | `.rotationEffect(.degrees(45))` | Rotation transform |
+| `animate-spin` | `.rotationEffect(angle).animation(.linear.repeatForever, value: angle)` | Continuous rotation |
+| `animate-pulse` | `.opacity(pulsing ? 0.5 : 1).animation(.easeInOut.repeatForever())` | Pulsing opacity |
+| CSS keyframe animation | `PhaseAnimator` or `KeyframeAnimator` | Complex multi-step animation |
+| React transition group | `.transition(.opacity)` / `.transition(.slide)` | View insert/remove transitions |
+| Framer Motion `layoutId` | `.matchedGeometryEffect(id:in:)` | Shared element transition |
+| Page transition | `.navigationTransition(.zoom)` or `.navigationTransition(.slide)` | iOS 18+ navigation transitions |
+
+## Responsive & Adaptive Layout
+
+| React/Tailwind/CSS | SwiftUI | Notes |
+|---|---|---|
+| `@media (min-width: 768px)` | `@Environment(\.horizontalSizeClass) var sizeClass` | Size class for adaptive layout |
+| `md:flex-row sm:flex-col` | `ViewThatFits { HStack { } VStack { } }` | Auto-adapting stack direction |
+| `hidden md:block` | `if sizeClass == .regular { View() }` | Show/hide based on size class |
+| `container mx-auto` | `.frame(maxWidth: 600)` or `ContainerRelativeFrame(.horizontal)` | Constrained content width |
+| CSS `@container` queries | `ContainerRelativeFrame(.horizontal) { length, axis in }` | iOS 17+ container-relative sizing |
+| `grid-cols-2 md:grid-cols-4` | `LazyVGrid(columns: adaptiveColumns)` with `.adaptive(minimum:)` | Adaptive grid columns |
+
+```swift
+// Adaptive grid that adjusts column count based on available width
+let columns = [GridItem(.adaptive(minimum: 160))]
+LazyVGrid(columns: columns) { /* items */ }
+
+// Size-class adaptive layout
+@Environment(\.horizontalSizeClass) var sizeClass
+var body: some View {
+    if sizeClass == .compact {
+        VStack { content }
+    } else {
+        HStack { content }
+    }
+}
+```
+
+## Scroll Behavior
+
+| React/Tailwind/CSS | SwiftUI | Notes |
+|---|---|---|
+| `scroll-snap-type: x mandatory` | `ScrollView(.horizontal) { }.scrollTargetBehavior(.paging)` | iOS 17+ paging scroll |
+| `scroll-snap-align: center` | `.scrollTargetLayout()` on inner content | Snap to items |
+| `scroll-behavior: smooth` | `.scrollPosition(id: $position)` | Programmatic smooth scroll |
+| `overscroll-behavior: none` | `.scrollBounceBehavior(.basedOnSize)` | Conditional bounce |
+| `position: sticky` | `.safeAreaBar(edge:)` or Section headers in List | Sticky headers |
+| Infinite scroll / lazy loading | `LazyVStack { }` + `.onAppear { loadMore() }` on last item | Lazy loading pattern |
+
 ## Translation Workflow
 
 1. **Parse structure first** — Identify the layout hierarchy (stacks, grids, scroll views)
@@ -163,5 +216,7 @@ When the React output contains these patterns, they likely represent iOS 26 Liqu
 3. **Convert layout** — Flexbox → stacks, grid → LazyVGrid, absolute → ZStack
 4. **Apply styling** — Colors, fonts, spacing as modifiers (not inline styles)
 5. **Handle iOS 26** — Identify blur/glass patterns and map to `.glassEffect()` APIs
-6. **Use project tokens** — Replace literal values with project design system tokens
-7. **Add interactivity** — Convert event handlers to SwiftUI actions and state
+6. **Handle animations** — Map CSS transitions/animations to SwiftUI animation modifiers
+7. **Make adaptive** — Convert media queries to size classes and `ViewThatFits`
+8. **Use project tokens** — Replace literal values with project design system tokens
+9. **Add interactivity** — Convert event handlers to SwiftUI actions and state

@@ -218,6 +218,58 @@ NavigationSplitView {
 | Lock Screen Widget - Rectangular Text Gauge | WidgetKit `.accessoryRectangular` with `Gauge` | Rectangular with gauge |
 | Lock Screen Widget - Rectangular with Chart | WidgetKit `.accessoryRectangular` with Swift Charts | Rectangular with chart |
 
+## Sheets & Presentations
+
+| Figma Component | SwiftUI Equivalent | Notes |
+|---|---|---|
+| Sheet | `.sheet(isPresented: $show) { SheetContent() }` | iOS 26 auto-applies glass to sheet backgrounds |
+| Sheet with Grabber | `.sheet { }.presentationDragIndicator(.visible)` | Sheet drag handle |
+| Presentation - Form Size | `.sheet { }.presentationSizing(.form)` | iOS 26 form-size sheet |
+| Presentation - Page Size | `.sheet { }.presentationSizing(.page)` | iOS 26 page-size sheet |
+| Popover | `.popover(isPresented: $show) { }` | Renders as popover on iPad, sheet on iPhone |
+
+## Charts & Data Visualization
+
+| Figma Component | SwiftUI Equivalent | Notes |
+|---|---|---|
+| Bar Chart | `Chart { BarMark(x:, y:) }` | Swift Charts framework |
+| Line Chart | `Chart { LineMark(x:, y:) }` | Swift Charts framework |
+| Area Chart | `Chart { AreaMark(x:, y:) }` | Swift Charts framework |
+| Pie/Donut Chart | `Chart { SectorMark(angle:) }` | iOS 17+ |
+| Gauge (circular) | `Gauge(value:in:) { }.gaugeStyle(.accessoryCircularCapacity)` | Circular gauge |
+| Gauge (linear) | `Gauge(value:in:) { }.gaugeStyle(.linearCapacity)` | Linear gauge bar |
+
+## Maps
+
+| Figma Component | SwiftUI Equivalent | Notes |
+|---|---|---|
+| Map View | `Map(coordinateRegion:)` or `Map { }` | MapKit for SwiftUI |
+| Map Annotation | `Map { Annotation("Title", coordinate:) { } }` | Custom annotation view |
+| Map Marker | `Map { Marker("Title", coordinate:) }` | System marker pin |
+
+## Media & Sharing
+
+| Figma Component | SwiftUI Equivalent | Notes |
+|---|---|---|
+| Photo Picker | `PhotosPicker(selection: $item, matching: .images) { Label("Select", systemImage: "photo") }` | PhotosUI framework |
+| Share Sheet / Activity View | `ShareLink(item: url) { Label("Share", systemImage: "square.and.arrow.up") }` | System share sheet |
+| Video Player | `VideoPlayer(player: avPlayer)` | AVKit framework |
+
+## Tips & Onboarding
+
+| Figma Component | SwiftUI Equivalent | Notes |
+|---|---|---|
+| Tip / Tooltip | `TipView(myTip)` | TipKit framework (iOS 17+) |
+| Inline Tip | `.popoverTip(myTip)` | Tip attached to a view |
+
+## Live Activities & Dynamic Island
+
+| Figma Component | SwiftUI Equivalent | Notes |
+|---|---|---|
+| Live Activity - Compact | `ActivityConfiguration { } compactLeading: { } compactTrailing: { }` | Dynamic Island compact |
+| Live Activity - Expanded | `ActivityConfiguration { } expanded: { }` | Dynamic Island expanded |
+| Live Activity - Lock Screen | WidgetKit `.supplementalActivityFamilies` | Lock screen live activity |
+
 ## System Components (Non-Implementable)
 
 These Figma components represent system-level UI. They exist for design reference, not for implementation:
@@ -255,5 +307,16 @@ When you have SwiftUI code and need to find the Figma component, use these searc
 | `.glassEffect()` | "Liquid Glass" |
 | `ContentUnavailableView` | "Empty States" |
 | `Button(.glass)` | "Button - Liquid Glass" |
-| `.sheet { }` | "Grabber" (for the drag indicator) |
+| `.sheet { }` | "Sheet" or "Grabber" (for the drag indicator) |
 | `ShareLink` | "Overlay" (Activity Views category) |
+| `Chart { BarMark }` | "Chart" or "Bar Chart" |
+| `Chart { LineMark }` | "Chart" or "Line Chart" |
+| `Map { }` | "Map" |
+| `PhotosPicker` | "Photo" or "Picker" |
+| `TipView` | "Tip" or "Tooltip" |
+| `Gauge` | "Gauge" |
+| `VideoPlayer` | "Video" or "Player" |
+| `.presentationSizing(.form)` | "Sheet" |
+| `NavigationPath` | "Navigation" |
+| `@Observable` | N/A — code pattern, not a Figma component |
+| `ScrollTargetBehavior` | "Page control" or scroll patterns |

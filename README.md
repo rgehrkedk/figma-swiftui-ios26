@@ -17,18 +17,36 @@ references/
   react-to-swiftui.md                 # React + Tailwind → SwiftUI translation rules
   property-mapping.md                 # Figma node properties → SwiftUI modifiers
   liquid-glass-translation.md         # Liquid Glass Figma ↔ .glassEffect() mapping
-  figma-mcp-workflow.md               # Optimal MCP tool call sequences
+  figma-mcp-workflow.md               # All 16 MCP tools, workflows, Code Connect, Figma Make
+  code-connect-swiftui.md             # Code Connect setup for SwiftUI (optimization layer)
+  accessibility-mapping.md            # Figma annotations → SwiftUI accessibility modifiers
+  mcp-ecosystem-guide.md              # Official vs third-party MCP server comparison
+  figma-skills-integration.md         # Integration with Figma's 7 official MCP skills
+tools/
+  sf_symbol_cli.swift                 # Swift CLI for SF Symbol SVG extraction
+  sf_symbol_svg.py                    # Cross-platform Python wrapper
+  sf-symbol-svg.sh                    # Bash auto-compile wrapper
+  symbol-cache/                       # Pre-cached SF Symbol SVGs
 ```
 
-### Reference Files
+### Core Reference Files
 
 | Reference | Purpose |
 |-----------|---------|
-| **Component Mapping** | Bidirectional lookup: Figma component name ↔ SwiftUI view/modifier |
-| **React → SwiftUI** | Systematic translation of layout (Flexbox → Stacks), styling, and components |
+| **Component Mapping** | Bidirectional lookup: Figma component name ↔ SwiftUI view/modifier (~80 components) |
+| **React → SwiftUI** | Layout (Flexbox → Stacks), styling, components, animation, responsive patterns |
 | **Property Mapping** | Figma auto-layout, fills, typography, effects → SwiftUI modifiers |
 | **Liquid Glass** | Complete `.glassEffect()` API mapping, decision tree, when NOT to use glass |
-| **Figma MCP Workflow** | Step-by-step tool call sequences for both translation directions |
+| **Figma MCP Workflow** | All 16 MCP tools, Code Connect, Figma Make, Code-to-Canvas, rate limits |
+
+### Extended Reference Files
+
+| Reference | Purpose |
+|-----------|---------|
+| **Code Connect SwiftUI** | Set up Code Connect so `get_design_context` returns SwiftUI directly |
+| **Accessibility Mapping** | Dynamic Type, VoiceOver, WCAG contrast, touch targets, glass a11y |
+| **MCP Ecosystem Guide** | When to use official Figma MCP vs. Figma Console MCP vs. Figma-Context-MCP |
+| **Figma Skills Integration** | How this skill extends Figma's 7 official MCP skills |
 
 ## Installation
 
@@ -89,7 +107,7 @@ Once installed, the skill activates automatically when you ask Claude Code to tr
 1. **Read** — Understand the SwiftUI view hierarchy
 2. **Map** — Find corresponding Figma component names using the component mapping table
 3. **Search** — Call `search_design_system` with the Figma component name
-4. **Create** — Use `use_figma` to build or modify the design
+4. **Create** — Use `use_figma` to build or modify the design, or paste into Figma's Code-to-Canvas
 
 ## iOS 26 APIs Covered
 

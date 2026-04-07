@@ -54,6 +54,22 @@ GlassEffectContainer(spacing: 8) {
 - `spacing` parameter defines the visual gap between glass shapes
 - Only wrap elements that are spatially related — not the entire screen
 
+#### GlassEffectContainer Edge Cases
+
+| Scenario | Behavior |
+|---|---|
+| Single glass child | Container still works but adds no benefit — use glass directly |
+| Nested containers | Avoid — only the outermost container applies. Flatten to a single container |
+| Container in ScrollView | Works, but glass elements that scroll offscreen stop participating in the container |
+| Dynamic content (ForEach) | Works — container adjusts as items are added/removed |
+| Container with non-glass children | Non-glass children are laid out normally, only glass children participate in the container effect |
+
+#### Performance Notes
+
+- Each `GlassEffectContainer` renders one combined background blur pass instead of N separate ones
+- For 3+ adjacent glass elements, container is significantly faster than individual glass effects
+- Don't wrap the entire screen — only the cluster of related glass elements
+
 ### Morph Transitions
 
 Glass shapes can morph between states using matched geometry:
@@ -209,6 +225,24 @@ Not every translucent Figma layer should become `.glassEffect()`:
 | Interactive floating chrome | `.glassEffect(.regular.interactive())` ← **this IS glass** |
 | Toolbar / tab bar backgrounds | Automatic — system applies glass to standard bars |
 | Custom floating panels/cards | `.glassEffect(.regular, in: .rect(cornerRadius: 22))` ← **this IS glass** |
+
+## Color Scheme Interaction
+
+Glass effects adapt to the current color scheme. When using `.preferredColorScheme()` or `@Environment(\.colorScheme)`:
+
+| Color Scheme | Glass Appearance |
+|---|---|
+| Light mode | Lighter tint, subtle shadow, brighter specular |
+| Dark mode | Darker tint, deeper shadow, dimmer specular |
+| Forced via `.preferredColorScheme(.dark)` | Glass adopts dark appearance even in light system mode |
+
+**Tinted glass in light vs. dark mode:**
+```swift
+// Tint color appearance varies by color scheme
+.glassEffect(.regular.tint(.blue))  // Brighter in light mode, deeper in dark mode
+```
+
+When Figma designs show both light and dark variants of a glass component, no code change is needed — the system handles appearance switching automatically. Only verify that text contrast is sufficient in both modes.
 
 ## Accessibility Considerations
 
